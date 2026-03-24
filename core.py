@@ -15,6 +15,11 @@ class Player:
     def __init__(self, name):
         self.name = name
         self.square = 0
+        self.prev_square = 0
+
+    def __repr__(self):
+        return (f"Player name: {self.name}\n"
+                f"Current square: {self.square}\n")
 
 
 class SnakesAndLadders:
@@ -68,29 +73,37 @@ class SnakesAndLadders:
         return (random.randint(1, 6), random.randint(1, 6))
 
     def play(self, die1, die2):
-        portal_str = ""
-
         if any(player.square == 100 for player in self.players):
             return "Game over!"
         
         player = self.players[self.current_player]
+        start_square = player.square
+
         new_square = player.square + die1 + die2
         
-        if new_square > 100:
-            new_square = 200 - new_square
+        bounce_str = ""
+        portal_str = ""
 
+        if new_square > 100:
+            bounce_target = 200 - new_square
+            bounce_str = f"bounce {bounce_target}"
+            new_square = bounce_target
+
+        # FIRST move normally
+        player.prev_square = start_square
+        player.square = new_square
+
+        # THEN check snake/ladder
         if new_square in self.snakes_and_ladders:
             portal = self.snakes_and_ladders[new_square]
             portal_str = f"{('ladder' if portal > new_square else 'snake')} {portal}"
-            player.square = portal
+            player.square = portal  # final position
 
-        player.square = new_square
-
-        result = (f"Player {player.name} Wins!"
-            if new_square == 100
-            else f"Player {player.name} to square {new_square} {portal_str}")
-        
-        player.square = new_square
+        result = (
+            f"Player {player.name} Wins!"
+            if player.square == 100
+            else f"Player {player.name} to square {new_square} {bounce_str} {portal_str}"
+        )
 
         if die1 != die2:
             self.current_player = (self.current_player + 1) % len(self.players)

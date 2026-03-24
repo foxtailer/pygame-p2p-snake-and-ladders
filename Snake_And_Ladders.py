@@ -3,6 +3,7 @@ from sys import exit
 import pygame
 
 from core import Player, SnakesAndLadders
+from tools import coordinate_converter
 
 
 pygame.init()
@@ -29,16 +30,96 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snakes and Ladders")
 clock = pygame.time.Clock()
 
+import os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 board_image = pygame.image.load('S.jpg')
 board_image = pygame.transform.scale(board_image, (BOARD_WIDTH, BOARD_HEIGHT))
 
+haven = (0, HEIGHT)
+square_centers = coordinate_converter(BOARD_WIDTH, BOARD_HEIGHT)
+square_centers[0] = haven
 
-def draw_players(pos1, pos2):
-    for pos, color in [(pos1, RED), (pos2, BLUE)]:
-        x = (pos - 1) % BOARD_COLS
-        y = BOARD_ROWS - 1 - (pos - 1) // BOARD_COLS
-        pygame.draw.circle(screen, color, (x * SQUARE_SIZE + SQUARE_SIZE // 2, y * SQUARE_SIZE + SQUARE_SIZE // 2), SQUARE_SIZE // 3)
+
+def move_player(player, centers, speed=5):
+    """
+    Move a player along a sequence of moves.
+    
+    move_sequence: tuple of tuples, e.g.
+        (('regular', 5), ('snake', 45))
+        (('regular', 5),)
+    
+    Rules:
+    - 'regular' moves step by step square by square
+    - 'snake' or 'ladder' moves directly to the target
+    """
+
+    def move_to(square):
+        global movement_flag  # ✅ make sure we modify the global flag
+
+        target_x, target_y = centers[square]
+        dx = target_x - player.x
+        dy = target_y - player.y
+        dist = (dx**2 + dy**2) ** 0.5
+
+        if dist < speed:
+            # Arrived at this square
+            player.x, player.y = target_x, target_y
+            player.prev_square = square
+            player.path.pop(0)
+
+            # If path is empty, move to next move in player.move
+            if not player.path:
+                if player.move:
+                    player.move.pop(0)  # finished current move
+
+                # If all moves finished, reset movement_flag
+                if not player.move:
+                    movement_flag = False
+        else:
+            # Move toward target smoothly
+            player.x += speed * dx / dist
+            player.y += speed * dy / dist
+
+    if player.move:
+        move_type, target_square = player.move[0]
+
+    # 1. Build path (ONLY ONCE)
+    if not player.path and player.move:
+        move_type, target_square = player.move[0]
+
+        if move_type == "regular":
+            player.path = list(range(player.prev_square + 1, target_square + 1))
+        elif move_type == "bounce":
+            up = list(range(player.prev_square + 1, 101))
+            down = list(range(99, target_square - 1, -1))
+            player.path = up + down
+        elif move_type in ("snake", "ladder"):
+            player.path = [target_square]
+
+    # 2. ALWAYS move if path exists
+    if player.path:
+        next_square = player.path[0]
+        move_to(next_square)
+
+    if not player.path and not player.move:
+        movement_flag = False
+
+    pygame.draw.circle(screen, player.color, (int(player.x), int(player.y)), SQUARE_SIZE // 3)
+
+
+def update_player(player, centers, speed=5):
+    if player.move:
+        # print(f"Updating player {player.name} with move: {move[player.name]}")
+        move_player(player, centers, speed)
+    else:
+        # print(f"No move for player {player.name}, keeping position.")
+        pygame.draw.circle(
+            screen,
+            player.color, 
+            centers[player.square],
+            SQUARE_SIZE // 3
+            )
 
 
 def display_player_info(player):
@@ -86,8 +167,23 @@ def exit_game():
 
 
 def game_loop():
-    p1, p2 = Player("1"), Player("2")
-    game = SnakesAndLadders((p1, p2))
+    players = (Player("1"), Player("2"))
+    p1, p2 = players
+    p1.color = RED
+    p2.color = BLUE
+    p1.move = []
+    p2.move = []
+    p1.path = []
+    p2.path = []
+    p1.x, p1.y = haven
+    p2.x, p2.y = haven
+
+    move = {}
+    
+    global movement_flag
+    movement_flag = False
+
+    game = SnakesAndLadders(players)
     die1, die2 = 0, 0
 
     while True:
@@ -96,16 +192,55 @@ def game_loop():
                 exit_game()
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE and not movement_flag:
                     die1, die2 = game.roll_dies()
-                    move = game.play(die1, die2)
-                    move = move.split()
+                    raw_move = game.play(die1, die2)
+                    raw_move = raw_move.split()
+
+                    match raw_move:
+                        case ["Game", "over!"]:
+                            exit_game()
+
+                        case ["Player", x, "Wins!"]:
+                            # Game over
+                            font = pygame.font.Font(None, 72)
+                            winner = "__Winner__"
+                            text = font.render(f"Player {winner} wins!", True, GREEN)
+                            screen.blit(text, (BOARD_WIDTH // 2 - text.get_width() // 2,
+                                                HEIGHT // 2 - text.get_height() // 2))
+                            pygame.display.flip()
+                            time.sleep(3)
+                            exit_game()
+
+                        case ["Player", x, "to", "square", y, *extra]:
+                            extra_tuples = [
+                                (extra[i], int(extra[i+1]))
+                                for i in range(0, len(extra) - 1, 2)
+                            ] if extra else []
+
+                            for player in players:
+                                if player.name == x:
+                                    player.move = [("regular", int(y)), *extra_tuples]
+
+                        case _:
+                            raise ValueError(f"Unexpected move: {raw_move}")
+
+                    # for player in players:
+                    #     player.path = []
+
+                    for player in players:
+                        print(player)
+
+                    movement_flag = True
         
         screen.fill(WHITE)
         screen.blit(board_image, (0, 0))
 
-        draw_players(p1.square, p2.square)
+        for player in players:
+            update_player(player, square_centers)
+
         display_player_info(game.current_player)
+
         if die1 and die2:
             draw_dice(die1, die2)
         
