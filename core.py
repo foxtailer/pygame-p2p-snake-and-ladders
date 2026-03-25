@@ -1,11 +1,11 @@
 """
-Return "Player n Wins!" where n is the winning player who has landed on square 100 
-after taking all steps in their turn.
+Return "Player n Wins!" where n is the winning player.name who has landed
+on square 100 after taking all steps in their turn.
 
 Return "Game over!" if a move is attempted after any player has won.
 
-Otherwise, return "Player n to regular x [snake x | ladder x]", where n is the current player and x is 
-the square they are currently on.
+Otherwise, return "Player n to regular x [snake x | ladder x | bounce x]", 
+where n is the current player and x is the square they are currently on.
 """
 
 import random
@@ -18,11 +18,19 @@ class Player:
         self.prev_square = 0
 
     def __repr__(self):
-        return (f"Player name: {self.name}\n"
-                f"Current square: {self.square}\n")
+        return (
+            f"Player name: {self.name} "
+            f"Current square: {self.square} "
+            f"Previous square: {self.prev_square} "
+        )
 
 
 class SnakesAndLadders:
+    """
+    Core of the game logic.
+    """
+
+    # For other board type.
     """snakes_and_ladders = {
          2: 38,
          7: 14,
@@ -49,9 +57,9 @@ class SnakesAndLadders:
         }"""
     
     snakes_and_ladders = {
-         4: 25,
-         21: 39,
-         29: 74,
+        4: 25,
+        21: 39,
+        29: 74,
         43: 76,
         63: 80,
         71: 89,
@@ -62,6 +70,7 @@ class SnakesAndLadders:
         82: 42,
         98: 55,
         92: 75,
+        73: 51,
         }
 
     def __init__(self, players: tuple[Player]):
@@ -73,12 +82,11 @@ class SnakesAndLadders:
         return (random.randint(1, 6), random.randint(1, 6))
 
     def play(self, die1, die2):
-        if any(player.square == 100 for player in self.players):
-            return "Game over!"
+        for player in self.players:
+            if player.square == 100:
+                return f"Player {player.name} Wins!"
         
         player = self.players[self.current_player]
-        start_square = player.square
-
         new_square = player.square + die1 + die2
         
         bounce_str = ""
@@ -89,26 +97,23 @@ class SnakesAndLadders:
             bounce_str = f"bounce {bounce_target}"
             new_square = bounce_target
 
-        # FIRST move normally
-        player.prev_square = start_square
+        player.prev_square = player.square
         player.square = new_square
 
-        # THEN check snake/ladder
         if new_square in self.snakes_and_ladders:
             portal = self.snakes_and_ladders[new_square]
             portal_str = f"{('ladder' if portal > new_square else 'snake')} {portal}"
             player.square = portal  # final position
 
-        result = (
-            f"Player {player.name} Wins!"
-            if player.square == 100
-            else f"Player {player.name} to square {new_square} {bounce_str} {portal_str}"
-        )
-
         if die1 != die2:
             self.current_player = (self.current_player + 1) % len(self.players)
 
-        return result
+        return (
+            f"Player {player.name} to square "
+            f"{new_square if not bounce_str else 100} " 
+            f"{bounce_str} "
+            f"{portal_str}"
+        )
     
     def begin(self):
         """
@@ -119,9 +124,6 @@ class SnakesAndLadders:
             move = move.split()
 
             match move:
-                case ["Game", "over!"]:
-                    # print(move)
-                    break
                 case ["Player", x, "Wins!"]:
                     print(f"Player {x} Wins!")
                     break

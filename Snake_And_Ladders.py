@@ -5,6 +5,9 @@ import pygame
 from core import Player, SnakesAndLadders
 from tools import coordinate_converter
 
+import os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 pygame.init()
 
@@ -30,9 +33,6 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snakes and Ladders")
 clock = pygame.time.Clock()
 
-import os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
 board_image = pygame.image.load('S.jpg')
 board_image = pygame.transform.scale(board_image, (BOARD_WIDTH, BOARD_HEIGHT))
 
@@ -42,20 +42,8 @@ square_centers[0] = haven
 
 
 def move_player(player, centers, speed=5):
-    """
-    Move a player along a sequence of moves.
-    
-    move_sequence: tuple of tuples, e.g.
-        (('regular', 5), ('snake', 45))
-        (('regular', 5),)
-    
-    Rules:
-    - 'regular' moves step by step square by square
-    - 'snake' or 'ladder' moves directly to the target
-    """
-
     def move_to(square):
-        global movement_flag  # ✅ make sure we modify the global flag
+        global movement_flag
 
         target_x, target_y = centers[square]
         dx = target_x - player.x
@@ -67,11 +55,13 @@ def move_player(player, centers, speed=5):
             player.x, player.y = target_x, target_y
             player.prev_square = square
             player.path.pop(0)
+            # print(player.path)
 
             # If path is empty, move to next move in player.move
             if not player.path:
                 if player.move:
                     player.move.pop(0)  # finished current move
+                    # print(player.move)
 
                 # If all moves finished, reset movement_flag
                 if not player.move:
@@ -80,9 +70,6 @@ def move_player(player, centers, speed=5):
             # Move toward target smoothly
             player.x += speed * dx / dist
             player.y += speed * dy / dist
-
-    if player.move:
-        move_type, target_square = player.move[0]
 
     # 1. Build path (ONLY ONCE)
     if not player.path and player.move:
@@ -124,12 +111,8 @@ def update_player(player, centers, speed=5):
 
 def display_player_info(player):
     font = pygame.font.Font(None, 30)
-    color = RED if player == 1 else BLUE
     y_offset = 10 
-    
-    pygame.draw.rect(screen, GRAY, (BOARD_WIDTH, y_offset, INFO_WIDTH, HEIGHT // 2 - 10))
-    
-    text = font.render(f"Player {player}", True, color)
+    text = font.render(f"Player {player.name} turn:", True, player.color)
     screen.blit(text, (BOARD_WIDTH + 10, y_offset + 10))   
 
 
@@ -178,7 +161,7 @@ def game_loop():
     p1.x, p1.y = haven
     p2.x, p2.y = haven
 
-    move = {}
+    move = {}  # Fake move before first roll.
     
     global movement_flag
     movement_flag = False
@@ -198,13 +181,10 @@ def game_loop():
                     raw_move = raw_move.split()
 
                     match raw_move:
-                        case ["Game", "over!"]:
-                            exit_game()
-
                         case ["Player", x, "Wins!"]:
                             # Game over
                             font = pygame.font.Font(None, 72)
-                            winner = "__Winner__"
+                            winner = (player for player in players if player.name == x).__next__()
                             text = font.render(f"Player {winner} wins!", True, GREEN)
                             screen.blit(text, (BOARD_WIDTH // 2 - text.get_width() // 2,
                                                 HEIGHT // 2 - text.get_height() // 2))
@@ -221,15 +201,10 @@ def game_loop():
                             for player in players:
                                 if player.name == x:
                                     player.move = [("regular", int(y)), *extra_tuples]
+                                    # print(player.move, player)
 
                         case _:
                             raise ValueError(f"Unexpected move: {raw_move}")
-
-                    # for player in players:
-                    #     player.path = []
-
-                    for player in players:
-                        print(player)
 
                     movement_flag = True
         
@@ -239,9 +214,10 @@ def game_loop():
         for player in players:
             update_player(player, square_centers)
 
-        display_player_info(game.current_player)
+        if not movement_flag:
+            display_player_info(players[game.current_player])
 
-        if die1 and die2:
+        if movement_flag:
             draw_dice(die1, die2)
         
         pygame.display.flip()
