@@ -11,4 +11,6 @@
 7. A player must land exactly on square 100 to win. If the roll exceeds the last square, the piece “bounces” backward the extra number of steps. *For example, if you are on square 98 and roll a five, move your piece to 100 (two steps), then "bounce" back to 99, 98, and 97 (three, four, then five steps).*
 8. If a player rolls a double and reaches square 100 exactly, the player wins and does not take an extra turn.
 
+## Online mod
 
+Use hole punching to create a UDP connection. It should work in ~82% of cases.
